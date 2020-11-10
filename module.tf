@@ -10,6 +10,20 @@ resource "azurerm_network_interface" "nic" {
   }
 }
 
+data "template_file" "cloudconfig" {
+  template = fileexists(var.cloud-config) ? file(var.cloud-config) : file("${path.module}/${var.cloud-config}")
+}
+
+data "template_cloudinit_config" "config" {
+  gzip          = true
+  base64_encode = true
+
+  part {
+    content_type = "text/cloud-config"
+    content      = data.template_file.cloudconfig.rendered
+  }
+}
+
 resource "azurerm_linux_virtual_machine" "vm" {
   name                = var.name
   resource_group_name = var.rg
@@ -19,6 +33,9 @@ resource "azurerm_linux_virtual_machine" "vm" {
   network_interface_ids = [
     azurerm_network_interface.nic.id,
   ]
+  zone = var.zone
+
+  custom_data = data.template_cloudinit_config.config.rendered
 
   admin_ssh_key {
     username   = var.adminuser
